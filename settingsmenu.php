@@ -23,6 +23,13 @@ function job_load_admin_scripts() {
 }
 add_action('admin_enqueue_scripts', 'job_load_admin_scripts');
 
+function child_enqueue_styles() {
+  wp_enqueue_style( 'applicant_form-style', plugins_url( 'settingsmenu/css/styles.css' ), array(), '1.0.0', 'all');
+  wp_enqueue_script( 'applicant_form-scripts', plugins_url( 'settingsmenu/js/form.js' ), array ('jquery'), '1.0.0', true);
+  wp_localize_script( 'applicant_form-scripts', 'settings',array('ajaxurl' => admin_url( 'admin-ajax.php' )));
+}
+add_action( 'wp_enqueue_scripts', 'child_enqueue_styles');
+
 /////////////////////
 //custome post part//
 /////////////////////
@@ -47,6 +54,27 @@ function create_posttype() {
 }
 // Hooking up our function to theme setup
 add_action( 'init', 'create_posttype' );
+
+// Our custom post type function
+function create_posttype_applicants() {
+
+    register_post_type( 'applicants', //important, id to show the post
+    // CPT Options
+        array(
+            'labels' => array(
+                'name' => __( 'Applicats' ), //name of custom post type
+                'singular_name' => __( 'Applicant' ) //singular name of custom post type
+            ),
+            'public' => true,
+            'has_archive' => true,
+            'rewrite' => array('slug' => 'applicants'),
+            'show_in_rest' => true,
+
+        )
+    );
+}
+// Hooking up our function to theme setup
+add_action( 'init', 'create_posttype_applicants' );
 
 
 /////////////////////////
@@ -218,6 +246,7 @@ function save_company_data_function( $post_id ){
     return;
   }
 
+
   $company_name_data = sanitize_text_field($_POST['company_name_field']);
   update_post_meta($post_id, '_company_name_key', $company_name_data);
   $company_email_data = sanitize_text_field($_POST['company_email_field']);
@@ -230,8 +259,9 @@ add_action('save_post', 'save_company_data_function');
 //function to display the saved post in accordance with the value of checkbox
 function show_content_in_page( $content ) {
     global $post;
+    // if(!empty($_POST['applicant_name']) && !empty($_POST['applicant_email']) && !empty($_POST['applicant_exp'])){
+    // }
 
-    $notice = "";
     //getting the value of checkbox
     $emailValue = esc_attr( get_option( 'show_email' ));
 
@@ -239,7 +269,7 @@ function show_content_in_page( $content ) {
     if($emailValue == "true"){
       // retrieve the global notice for the current post
       $global_notice = esc_attr(get_post_meta( $post->ID, '_company_email_key', true ) );
-      $notice = "<div class='sp_global_notice'>$global_notice</div>";
+      $emailVal = "<div class='sp_global_notice'>$global_notice</div>";
     }
 
     //getting the value of radio button
@@ -254,22 +284,137 @@ function show_content_in_page( $content ) {
     $current_date = esc_attr( get_option( 'filter_date_picker' ));
     // checking weather the expiry date is less than current date
     if($post_expiry_date < $current_date){
-      $status = "<div class='sp_global_notice'>Expired</div>";
+      $status = '<div class="sp_global_notice"><button id="exp-button" disabled>Expired</button></div>';
     }
     else {
-      $status = "<div class='sp_global_notice'>Apply now</div>";
+      $status = '<div class="sp_global_notice"><button id="apply-button">Apply now</button></div>';
     }
     //getting description value from settings
     $description = esc_attr(get_option('organisation_description'));
     $description = "<div class='sp_global_notice'>$description</div>";
 
-    return $contents . $notice . $status . $description;
+    $application_form = job_applicant_form();
+
+    $applicant_data = "<div id='data-container'>
+                      <h4 id='application-status'></h4>
+                      <div id='details-container'>
+                      <div class='sp_global_notice' id='name-data'>Name: </div>
+                      <div class='sp_global_notice' id='email-data'>Email: </div>
+                      <div class='sp_global_notice' id='phone-data'>Phone: </div>
+                      <div class='sp_global_notice' id='exp-data'>Experience: </div>
+                      </div>
+                      </div>";
+
+    $slug = "application_jobs";
+    if($slug != $post->post_type){
+      return $content;
+    }
+
+    return $contents . $emailVal . $description . $status . $application_form . $applicant_data;
 }
 //filtering the content to show in site
 add_filter('the_content', 'show_content_in_page');
 
+//to only show the content in the custom post 'Applicants' and only its button, while opening post of "applicant" custom post type.
+function show_content_in_page_applicants( $content ) {
+    global $post;
+    $status = '<div class="sp_global_notice"><button id="delete-button">Delete</button></div>';
+
+    $slug = "applicants";
+    if($slug != $post->post_type){
+      return $content;
+    }
+    $id = $post->ID;
+    $ids = "<div id='post_id'>$id</div>";
+
+    return $content . $status . $ids;
+}
+add_filter('the_content', 'show_content_in_page_applicants');
 
 
+function job_applicant_form() {
+  ob_start(); ?>
+    <form id="applicantsform" action="<?php echo admin_url('admin-ajax.php'); ?>" method="post">
+      <fieldset>
+        <p>
+          <label for="applicant_name">First name</label>
+          <input type="text" id="applicant-name" name="applicant_name" value="">
+        </p>
+        <p>
+          <label for="applicant_email">Email</label>
+          <input type="email" id="applicant-email" name="applicant_email" value="">
+        </p>
+        <p>
+          <label for="applicant_phone">Phone</label>
+          <input type="text" id="applicant-phone" name="applicant_phone" value="">
+        </p>
+        <p>
+          <label for="applicant_exp">Experience</label>
+          <input type="number" id="applicant-exp" name="applicant_exp" value="">
+        </p>
+        <p>
+          <input type="hidden" name="action" value="custom_action">
+          <input type="submit" name="" id="app-submit" value="Submit">
+        </p>
+      </fieldset>
+      <?php wp_nonce_field( 'cpt_nonce_action', 'cpt_nonce_field' ); ?>
+    </form>
+  <?php
+  return ob_get_clean();
+}
+
+
+add_action( 'wp_ajax_custom_action', 'custom_action' );
+add_action( 'wp_ajax_nopriv_custom_action', 'custom_action' );
+function custom_action() {
+  global $post;
+
+  write_log('hi');
+  // $content ='Name: ' . $_POST['applicant_name'] . '</br>' . 'Email: ' . $_POST['applicant_email'] . '</br>' .
+  //           'Phone: ' . $_POST['applicant_phone'] . '</br>' . 'Experience: ' . $_POST['applicant_exp'];
+  $name = $_POST['applicant_name'];
+  $email = $_POST['applicant_email'];
+  $phone = $_POST['applicant_phone'];
+  $exp = $_POST['applicant_exp'];
+
+  $content = "<div id='applicant_name'>$name</div>
+              <div id='applicant_email'>$email</div>
+              <div id='applicant_phone'>$phone</div>
+              <div id='applicant_exp'>$exp</div>
+              ";
+
+  // if (isset( $_POST[‘cpt_nonce_field’] ) && wp_verify_nonce( $_POST['cpt_nonce_field'], 'cpt_nonce_action' ) ) {
+    $post = array(
+        'post_title'    => $_POST['applicant_name'],
+        'post_content'  => $content,
+        // 'post_category' => $_POST['applicants'],
+        // 'tags_input'    => $_POST['post_tags'],
+        'post_status'   => 'draft',   // Could be: publish
+        'post_type' 	=> 'applicants' // Could be: `page` or your CPT
+    );
+    write_log($post);
+    wp_insert_post($post);
+
+  // }
+    // Don't forget to exit at the end of processing
+    // exit(json_encode($response));
+}
+
+add_action( 'wp_ajax_my_delete_post', 'my_delete_post' );
+function my_delete_post(){
+
+    $permission = check_ajax_referer( 'my_delete_post_nonce', 'nonce', false );
+    if( $permission == false ) {
+        echo 'error';
+    }
+    else {
+        wp_delete_post( $_REQUEST['id'] );
+        echo 'success';
+    }
+
+    die();
+
+}
 
 //function to show the errors
 if (!function_exists('write_log')) {
