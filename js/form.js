@@ -4,28 +4,23 @@ jQuery(document).ready(function($){
         console.log("hi")
         $("#applicantsform").show();
     });
-
+  //programe for deleting the post
   $("#delete-button").click(function() {
-        var names = $("#post_id").text();
-        console.log(names);
-        var id = $("#post_id").text();
-        // var nonce = $(this).data('nonce');
-        // var post = $(this).parents('.post:first');
-        // console.log(post);
+        var id = $("#post_id").val();
+        var nonce = $("#app_nonce").val();
+        var post = $(this).parents('.post:first');
+
         $.ajax({
             type: 'post',
             url: settings.ajaxurl,
             data: {
                 action: 'my_delete_post',
-                // nonce: nonce,
+                nonce: nonce,
                 id: id
             },
             success: function( result ) {
-                if( result == 'success' ) {
-                    post.fadeOut( function(){
-                        post.remove();
-                    });
-                }
+              // alert('Deleted succesfully ');
+              $(location).attr('href','http://localhost/basic_jobs/')
             }
         });
         return false;
@@ -37,11 +32,6 @@ jQuery(document).ready(function($){
 
   // Bind to the submit event of our form
   $("#applicantsform").submit(function(event){
-
-      $('#apply-button').click(function() {
-          $("#applicantsform").hide();
-          location.reload();
-      });
 
       // Prevent default posting of form - put here to work in case of errors
       event.preventDefault();
@@ -60,43 +50,43 @@ jQuery(document).ready(function($){
         $("#phone-data").append(phone);
         $("#exp-data").append(exp);
         $("#details-container").show();
-      }else{
-        $("#application-status").append("All fields are required, Try again");
-      }
-      $("#data-container").show();
 
 
-      // Abort any pending request
-      if (request) {
+        $("#data-container").show();
 
-          request.abort();
-      }
-      // setup some local variables
-      var $form = $(this);
+        // Abort any pending request
+        if (request) {
+            request.abort();
+        }
 
+        // setup some local variables
+        var $form = $(this);
 
-      console.log($form);
-      var form_data = {};
-      $('#applicantsform').find('input').each(function () {
-          form_data[this.name] = $(this).val();
-      });
-      console.log(form_data);
-
-      $.ajax({
-            type: 'POST',
-            url: settings.ajax_url,
-            data: form_data,
-            success : function() {
-              $.post($form.attr('action'), form_data, function(data) {
-                   alert('This is data returned from the server ' + data);
-              }, 'json');
-
-            }
+        var form_data = {};
+        $('#applicantsform').find('input').each(function () {
+            form_data[this.name] = $(this).val();
         });
+        console.log(form_data);
 
+        $.ajax({
+              type: 'POST',
+              url: settings.ajax_url,
+              data: form_data,
+              success : function() {
+                $.post($form.attr('action'), form_data, function(data) {
+                     alert('Applied succesfully ' + form_data);
+                }, 'json');
 
+              }
+          });
+
+        $('#apply-button').click(function() {
+            $("#applicantsform").hide();
+            location.reload();
+        });
+      }else{
+        alert("All fields are required, Try again");
+        // $("#application-status").append("All fields are required, Try again");
+      }
   });
-
-
-
 });
